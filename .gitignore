@@ -1,171 +1,306 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+import gc
 
-# C extensions
-*.so
+import json
+from tqdm import tqdm
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+import torch
+import torch.nn as nn
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+import warnings
+warnings.filterwarnings(action='ignore')
 
-# Translations
-*.mo
-*.pot
+# import data processing and visualisation libraries
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+%matplotlib inline
+import plotly.io as pio
+pio.templates.default = "simple_white"
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+# import tensorflow and keras
+import tensorflow as tf
+import os
 
-# Flask stuff:
-instance/
-.webassets-cache
+print("Packages imported...")
 
-# Scrapy stuff:
-.scrapy
+df = pd.read_csv("/kaggle/input/asl-fingerspelling/train.csv")
+metadata = pd.read_csv("/kaggle/input/asl-fingerspelling/supplemental_metadata.csv")
 
-# Sphinx documentation
-docs/_build/
+print(f"Total number of files : {df.shape[0]}")
+print(f"Total number of Participant in the dataset : {df.participant_id.nunique()}")
+print(f"Total number of unique phrases : {df.phrase.nunique()}")
 
-# PyBuilder
-.pybuilder/
-target/
+print(f"Total number of files in metadata: {metadata.shape[0]}")
+print(f"Total number of participants in metadata : {metadata.participant_id.nunique()}")
+print(f"Total number of unique phrases in metadata : {metadata.phrase.nunique()}")
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Check the dimensions of the dataset
+df.shape
 
-# IPython
-profile_default/
-ipython_config.py
+# Check the data types of columns
+df.info()
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
+df.describe()
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+np.array(list(df["path"].value_counts().to_dict().values())).min()
+df["path"].describe().to_frame().T
+df["participant_id"].astype(str).describe().to_frame().T
 
-# UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
+# Set the custom color scheme
+color_scheme = ["#4f000b", "#720026", "#ce4257", "#ff7f51", "#ff9b54"]
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
+#The column is set to strings as it is an ID
+df["participant_id"] = df["participant_id"].astype(str)
 
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/latest/usage/project/#working-with-version-control
-.pdm.toml
-.pdm-python
-.pdm-build/
+# Calculate the counts for each participant_id
+counts = df["participant_id"].value_counts()
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
+# Set up the figure and axes
+fig, ax = plt.subplots(figsize=(15, 6))
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+# Plot the histogram
+bars = ax.bar(counts.index, counts.values, color=color_scheme[1])
 
-# SageMath parsed files
-*.sage.py
+# Set the labels and title
+ax.set_xlabel("Participant ID")
+ax.set_ylabel("Total Row Count")
+ax.set_title("Row Counts by Participant ID")
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+# Rotate the x-axis labels if needed
+plt.xticks(rotation=90, ha='center')
+plt.xlim(-1, 94)
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Show the plot
+plt.show()
 
-# Rope project settings
-.ropeproject
 
-# mkdocs documentation
-/site
+df["sequence_id"].astype(str).describe().to_frame().T
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+import seaborn as sns
 
-# Pyre type checker
-.pyre/
+df['phrase_len'] = df.phrase.str.len()
+metadata['phrase_len'] = metadata.phrase.str.len()
 
-# pytype static type analyzer
-.pytype/
+for param in ['text.color', 'axes.labelcolor', 'xtick.color', 'ytick.color']:
+    plt.rcParams[param] = '#000000'  # very light grey
 
-# Cython debug symbols
-cython_debug/
+for param in ['figure.facecolor', 'axes.facecolor', 'savefig.facecolor']:
+    plt.rcParams[param] = '#ffffff'  # bluish dark grey
 
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+fig, axs = plt.subplots(1, 1, figsize=(10, 7), tight_layout=True)
 
-# PyPI configuration file
-.pypirc
+# Remove axes splines
+for s in ['top', 'bottom', 'left', 'right']:
+    axs.spines[s].set_visible(False)
+
+# Remove x, y ticks
+axs.xaxis.set_ticks_position('none')
+axs.yaxis.set_ticks_position('none')
+
+# Add padding between axes and labels
+axs.xaxis.set_tick_params(pad=5)
+axs.yaxis.set_tick_params(pad=10)
+
+# Set the custom color scheme
+color_scheme = ["#4f000b", "#720026", "#ce4257", "#ff7f51", "#ff9b54"]
+
+# Add x, y gridlines
+axs.grid(visible=True, color='grey', linestyle='-.', linewidth=0.5, alpha=0.6)
+
+
+plt.subplot(1, 2, 1)
+sns.histplot(df.phrase_len, kde=True, binwidth = 2, color=color_scheme[0])
+plt.title('Character occurences in each phrase in training set')
+plt.xlabel('Phrase length')
+plt.ylabel('Sample Count')
+
+plt.subplot(1, 2, 2)
+sns.histplot(metadata.phrase_len, kde=True, binwidth = 2, color=color_scheme[0])
+plt.title('    and Supplementary metadata')
+plt.xlabel('Unique characters')
+plt.ylabel('Sample Count')
+plt.grid(axis='y')
+
+plt.tight_layout()
+plt.show()
+
+sample = pd.read_parquet("/kaggle/input/asl-fingerspelling/train_landmarks/1019715464.parquet")
+print(f"Sample shape = {sample.shape}")
+sample.sample(10)
+sample.describe()
+
+def get_cols(df, words_pos, words_neg=[], ret_names=True):
+    cols = []
+    names = []
+    for col in df.columns:
+        # Check if column name contains all words
+        if all([w in col for w in words_pos]) and all([w not in col for w in words_neg]):
+            cols.append(df[col])  # Append the entire column to the list
+            names.append(col)
+
+    if ret_names:
+        return cols, names
+    else:
+        return cols
+
+# Landmark Indices for Left/Right hand without z axis in raw data
+LH_Index, LEFT_HAND_NAME = get_cols(sample, ['left_hand'], ['z'])
+RH_Index,RIGHT_HAND_NAME = get_cols(sample, ['right_hand'], ['z'])
+#RIGHT_HAND_NAMES0.insert(0, "frame")
+LEFT_HAND_NAME.insert(0, "frame")
+COLUMNS = np.concatenate((LEFT_HAND_NAME, RIGHT_HAND_NAME))
+
+N_COLS0 = len(COLUMNS)
+
+print(f'Total number of columns: {N_COLS0}')
+
+RIGHT_HAND = sample.loc[:, RIGHT_HAND_NAME] 
+LEFT_HAND = sample.loc[:, LEFT_HAND_NAME] 
+RIGHT_HAND
+
+print(f"Percentage of nulls in Left Hand data = {100*np.mean(LEFT_HAND['x_left_hand_0'].isnull()):.02f} %")
+print(f"Percentage of nulls in Right Hand data = {100*np.mean(RIGHT_HAND['x_right_hand_0'].isnull()):.02f} %")
+
+print(f"Percentage of nulls in Left Hand data = {100*np.mean(LEFT_HAND['x_left_hand_0'].isnull()):.02f} %")
+print(f"Percentage of nulls in Right Hand data = {100*np.mean(RIGHT_HAND['x_right_hand_0'].isnull()):.02f} %")
+
+len(label_map)
+
+# Memory saving function credit to https://www.kaggle.com/gemartin/load-data-reduce-memory-usage
+def reduce_mem_usage(df):
+    """ iterate through all the columns of a dataframe and modify the data type
+        to reduce memory usage.        
+    """
+    #start_mem = df.memory_usage().sum() / 1024**2
+    #print('Memory usage of dataframe is {:.2f} MB'.format(start_mem))
+
+    for col in df.columns:
+        col_type = df[col].dtype
+
+        if col_type != object:
+            c_min = df[col].min()
+            c_max = df[col].max()
+            if str(col_type)[:3] == 'int':
+                if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
+                    df[col] = df[col].astype(np.int8)
+                elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(np.int16).max:
+                    df[col] = df[col].astype(np.int16)
+                elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(np.int32).max:
+                    df[col] = df[col].astype(np.int32)
+                elif c_min > np.iinfo(np.int64).min and c_max < np.iinfo(np.int64).max:
+                    df[col] = df[col].astype(np.int64)  
+            else:
+                if c_min > np.finfo(np.float16).min and c_max < np.finfo(np.float16).max:
+                    df[col] = df[col].astype(np.float16)
+                elif c_min > np.finfo(np.float32).min and c_max < np.finfo(np.float32).max:
+                    df[col] = df[col].astype(np.float32)
+                else:
+                    df[col] = df[col].astype(np.float64)
+
+    return df
+
+import multiprocessing as mp
+import pandas as pd
+import torch
+import numpy as np
+
+# Function to process a single parquet file
+def process_parquet(row):
+    path = os.path.join("/kaggle/input/asl-fingerspelling", row[1].path)
+    data_columns = COLUMNS
+    landmark_df = pd.read_parquet(path, columns=data_columns)
+
+    # Group the landmarks by sequence_id
+    grouped_landmarks = landmark_df.groupby('sequence_id')
+
+    # Initialize empty lists to store features and labels
+    features = []
+    labels = []
+
+    # Iterate over each sequence_id
+    for sequence_id, group in grouped_landmarks:
+        # Get the label for the sequence
+        phrase = df.loc[df['sequence_id'] == sequence_id, 'phrase'].iloc[0]
+
+        # Map each letter in the phrase using label_map
+        mapped_phrase = [letter for letter in phrase]
+        
+        # Create a new Series with sequence and mapped_phrase
+        result_series = pd.DataFrame({'sequence_id': sequence_id, 'mapped_phrase': mapped_phrase}) 
+        result_series['label'] = result_series['mapped_phrase'].map(label_map).astype(np.int8)  
+
+        # Convert the label Series to a list
+        #label_list = result_series['label'].tolist()
+
+        # Initialize an empty feature vector for the sequence
+        sequence_features = []
+        
+        # Iterate over each landmark index
+        for landmark_index in range(20):
+            # Generate feature names for x, y, z coordinates
+            x_feature = f'x_right_hand_{landmark_index}'
+            y_feature = f'y_right_hand_{landmark_index}'
+
+            # Get the x, y, z coordinates for the landmark
+            x = group[x_feature].values.astype(np.float16)
+            y = group[y_feature].values.astype(np.float16)
+
+            # Replace NaN values with 0
+            x[np.isnan(x)] = 0.0
+            y[np.isnan(y)] = 0.0
+                        
+            # Perform feature transformations or calculations
+            x = torch.tensor(x).contiguous().view(-1, x.shape[0])
+            y = torch.tensor(y).contiguous().view(-1, y.shape[0])
+            
+            x_mean = torch.mean(x, 0) 
+            y_mean = torch.mean(y, 0) 
+
+            x_std = torch.std(x, 1) 
+            y_std = torch.std(y, 1) 
+
+            # Add the calculated features to the sequence feature vector
+            sequence_features = torch.cat([x_mean, y_mean,x_std,y_std], axis=0)
+            #sequence_features = torch.where(torch.isnan(sequence_features), torch.tensor(0.0, dtype=torch.float32), sequence_features)
+
+            diff = 3258 - sequence_features.shape[0]
+            if diff > 0:
+                padding = torch.zeros(diff)
+                sequence_features = torch.cat((sequence_features, padding))
+            
+            features = sequence_features[:3258].cpu().numpy()
+            
+            
+            return features, result_series['label']
+
+if __name__ == '__main__':
+    df = pd.read_csv(TRAIN_FILE)
+    df = reduce_mem_usage(df) 
+    df2 = df.head(30)
+
+    max_label_length = 30
+    all_features = np.zeros((df.shape[0], 3258))
+    labels = np.zeros((df.shape[0], max_label_length))
+    #all_features = []
+    #labels = []
+
+    # Process parquet files in parallel
+    with mp.Pool() as pool:
+        results = pool.imap(process_parquet, df.iterrows(), chunksize=250)
+        for i, (x, y) in tqdm(enumerate(results), total=df.shape[0]):
+            all_features[i, :] = x
+            labels[i, :len(y)] = y.values.reshape(1, -1)
+
+    # Print the shapes of the tensors
+    np.save("feature_data.npy", all_features)
+    np.save("feature_labels.npy", labels)
+
+    print("Features tensor shape:", all_features.shape)
+    print("Labels tensor shape:", labels.shape)
